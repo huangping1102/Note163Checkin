@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Note163Checkin - 有道云笔记自动签到工具</title>
+    <meta name="description" content="基于GitHub Actions的有道云笔记每日自动签到工具，每日可新增30M+存储空间">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        'sans': ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+                    },
+                    colors: {
+                        primary: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            200: '#bae6fd',
+                            300: '#7dd3fc',
+                            400: '#38bdf8',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            800: '#075985',
+                            900: '#0c4a6e',
+                        }
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.6s ease-out forwards',
+                        'slide-up': 'slideUp 0.6s ease-out forwards',
+                        'bounce-gentle': 'bounceGentle 2s ease-in-out infinite',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0', transform: 'translateY(20px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' }
+                        },
+                        slideUp: {
+                            '0%': { opacity: '0', transform: 'translateY(30px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' }
+                        },
+                        bounceGentle: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-10px)' }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .dark .gradient-bg {
+            background: linear-gradient(135deg, #1e3a8a 0%, #3730a3 100%);
+        }
+        
+        .glass-effect {
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .dark .glass-effect {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .card-hover {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .card-hover:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        
+        .dark .card-hover:hover {
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2);
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .section-animate {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .section-animate.in-view {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        
+        .code-block {
+            background: #1e293b;
+            border-radius: 12px;
+            padding: 1.5rem;
+            overflow-x: auto;
+        }
+        
+        .dark .code-block {
+            background: #0f172a;
+        }
+        
+        .step-number {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            width: 2rem;
+            height: 2rem;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white font-sans transition-colors duration-300">
+    <!-- Navigation -->
+    <nav class="fixed top-0 w-full z-50 glass-effect">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center py-4">
+                <div class="flex items-center space-x-3">
+                    <img src="./images/checkIn_256_icon.png" alt="Logo" class="w-8 h-8 rounded-lg">
+                    <span class="text-xl font-bold">Note163Checkin</span>
+                </div>
+                
+                <div class="flex items-center space-x-4">
+                    <a href="#features" class="hidden md:inline-block hover:text-primary-600 transition-colors">功能特色</a>
+                    <a href="#installation" class="hidden md:inline-block hover:text-primary-600 transition-colors">安装指南</a>
+                    <a href="#configuration" class="hidden md:inline-block hover:text-primary-600 transition-colors">配置说明</a>
+                    
+                    <!-- Dark Mode Toggle -->
+                    <button id="theme-toggle" class="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+                        <i class="fas fa-sun dark:hidden"></i>
+                        <i class="fas fa-moon hidden dark:inline"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="pt-20 pb-16 gradient-bg">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center text-white">
+                <div class="animate-bounce-gentle mb-8">
+                    <img src="./images/checkIn_256_icon.png" alt="Note163Checkin Logo" class="w-32 h-32 mx-auto rounded-2xl shadow-2xl">
+                </div>
+                
+                <h1 class="text-5xl md:text-6xl font-bold mb-6 animate-fade-in">
+                    Note163Checkin
+                </h1>
+                
+                <p class="text-xl md:text-2xl mb-8 opacity-90 animate-slide-up">
+                    基于 GitHub Actions 的有道云笔记每日自动签到工具
+                </p>
+                
+                <div class="flex flex-wrap justify-center gap-4 mb-8 animate-slide-up">
+                    <div class="glass-effect px-4 py-2 rounded-full">
+                        <i class="fas fa-calendar-check mr-2"></i>
+                        每日自动签到
+                    </div>
+                    <div class="glass-effect px-4 py-2 rounded-full">
+                        <i class="fas fa-database mr-2"></i>
+                        新增 30M+ 存储
+                    </div>
+                    <div class="glass-effect px-4 py-2 rounded-full">
+                        <i class="fas fa-users mr-2"></i>
+                        支持多账号
+                    </div>
+                </div>
+                
+                <div class="flex flex-wrap justify-center gap-4 animate-slide-up">
+                    <a href="#installation" class="btn-primary px-8 py-3 rounded-lg font-semibold text-white inline-flex items-center">
+                        <i class="fas fa-rocket mr-2"></i>
+                        开始使用
+                    </a>
+                    <a href="https://github.com/xiuluo211314/Note163Checkin" target="_blank" class="glass-effect px-8 py-3 rounded-lg font-semibold text-white inline-flex items-center hover:bg-white hover:bg-opacity-20 transition-all">
+                        <i class="fab fa-github mr-2"></i>
+                        查看源码
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- GitHub Stats -->
+    <section class="py-12 bg-white dark:bg-gray-800">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-8">
+                <div class="text-center">
+                    <div class="text-3xl font-bold text-primary-600 mb-2">
+                        <i class="fas fa-star"></i>
+                    </div>
+                    <p class="text-gray-600 dark:text-gray-300">GitHub Stars</p>
+                </div>
+                <div class="text-center">
+                    <div class="text-3xl font-bold text-primary-600 mb-2">
+                        <i class="fas fa-code-branch"></i>
+                    </div>
+                    <p class="text-gray-600 dark:text-gray-300">Forks</p>
+                </div>
+                <div class="text-center">
+                    <div class="text-3xl font-bold text-primary-600 mb-2">
+                        <i class="fas fa-exclamation-circle"></i>
+                    </div>
+                    <p class="text-gray-600 dark:text-gray-300">Issues</p>
+                </div>
+                <div class="text-center">
+                    <div class="text-3xl font-bold text-primary-600 mb-2">
+                        <i class="fas fa-balance-scale"></i>
+                    </div>
+                    <p class="text-gray-600 dark:text-gray-300">MIT License</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section id="features" class="py-16 section-animate">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl font-bold mb-4">功能特色</h2>
+                <p class="text-xl text-gray-600 dark:text-gray-300">强大的自动化签到解决方案</p>
+            </div>
+            
+            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <div class="card-hover bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-lg">
+                    <div class="text-4xl text-primary-600 mb-4">
+                        <i class="fas fa-robot"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-3">自动化签到</h3>
+                    <p class="text-gray-600 dark:text-gray-300">基于 GitHub Actions 的定时任务，每日自动执行签到流程，无需手动操作</p>
+                </div>
+                
+                <div class="card-hover bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-lg">
+                    <div class="text-4xl text-primary-600 mb-4">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-3">多账号支持</h3>
+                    <p class="text-gray-600 dark:text-gray-300">支持配置多个有道云笔记账号，批量执行签到任务，提高效率</p>
+                </div>
+                
+                <div class="card-hover bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-lg">
+                    <div class="text-4xl text-primary-600 mb-4">
+                        <i class="fas fa-database"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-3">数据持久化</h3>
+                    <p class="text-gray-600 dark:text-gray-300">支持 Redis 缓存和 MySQL 数据库存储，记录签到历史和状态信息</p>
+                </div>
+                
+                <div class="card-hover bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-lg">
+                    <div class="text-4xl text-primary-600 mb-4">
+                        <i class="fas fa-bell"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-3">智能通知</h3>
+                    <p class="text-gray-600 dark:text-gray-300">集成 Server 酱推送服务，支持微信通知，及时了解签到状态</p>
+                </div>
+                
+                <div class="card-hover bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-lg">
+                    <div class="text-4xl text-primary-600 mb-4">
+                        <i class="fas fa-gift"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-3">存储奖励</h3>
+                    <p class="text-gray-600 dark:text-gray-300">每日可获得 30M+ 存储空间奖励，通过看广告等方式最大化收益</p>
+                </div>
+                
+                <div class="card-hover bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-lg">
+                    <div class="text-4xl text-primary-600 mb-4">
+                        <i class="fas fa-shield-alt"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-3">安全可靠</h3>
+                    <p class="text-gray-600 dark:text-gray-300">基于官方 API 接口，安全可靠，支持 Cookie 复用避免频繁登录</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Installation Section -->
+    <section id="installation" class="py-16 bg-gray-50 dark:bg-gray-800 section-animate">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl font-bold mb-4">安装指南</h2>
+                <p class="text-xl text-gray-600 dark:text-gray-300">简单几步，快速部署自动签到服务</p>
+            </div>
+            
+            <div class="space-y-12">
+                <!-- Step 1 -->
+                <div class="flex flex-col lg:flex-row items-center lg:items-start gap-8">
+                    <div class="flex-shrink-0">
+                        <div class="step-number">1</div>
+                    </div>
+                    <div class="flex-1">
+                        <h3 class="text-2xl font-bold mb-4">Fork 仓库</h3>
+                        <p class="text-gray-600 dark:text-gray-300 mb-6">
+                            使用 GitHub 账户登录后，点击右上角的 Fork 按钮将仓库复制到您的账户中
+                        </p>
+                        <div class="bg-white dark:bg-gray-700 p-4 rounded-lg shadow-md">
+                            <img src="./images/1.png" alt="Fork 仓库" class="w-full rounded-lg">
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Step 2 -->
+                <div class="flex flex-col lg:flex-row items-center lg:items-start gap-8">
+                    <div class="flex-shrink-0">
+                        <div class="step-number">2</div>
+                    </div>
+                    <div class="flex-1">
+                        <h3 class="text-2xl font-bold mb-4">添加 Secret 配置</h3>
+                        <p class="text-gray-600 dark:text-gray-300 mb-6">
+                            在仓库设置中添加名为 <code class="bg-gray-200 dark:bg-gray-600 px-2 py-1 rounded">CONF</code> 的 Secret，包含账号密码等配置信息
+                        </p>
+                        <div class="grid md:grid-cols-2 gap-6">
+                            <div class="bg-white dark:bg-gray-700 p-4 rounded-lg shadow-md">
+                                <img src="./images/2.png" alt="添加 Secret" class="w-full rounded-lg">
+                            </div>
+                            <div class="bg-white dark:bg-gray-700 p-4 rounded-lg shadow-md">
+                                <img src="./images/3.png" alt="Secret 配置" class="w-full rounded-lg">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Step 3 -->
+                <div class="flex flex-col lg:flex-row items-center lg:items-start gap-8">
+                    <div class="flex-shrink-0">
+                        <div class="step-number">3</div>
+                    </div>
+                    <div class="flex-1">
+                        <h3 class="text-2xl font-bold mb-4">运行 Action</h3>
+                        <p class="text-gray-600 dark:text-gray-300 mb-6">
+                            在 Actions 页面手动运行工作流，或等待定时任务自动执行
+                        </p>
+                        <div class="bg-white dark:bg-gray-700 p-4 rounded-lg shadow-md">
+                            <img src="./images/4.png" alt="运行 Action" class="w-full rounded-lg">
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Step 4 -->
+                <div class="flex flex-col lg:flex-row items-center lg:items-start gap-8">
+                    <div class="flex-shrink-0">
+                        <div class="step-number">4</div>
+                    </div>
+                    <div class="flex-1">
+                        <h3 class="text-2xl font-bold mb-4">查看运行结果</h3>
+                        <p class="text-gray-600 dark:text-gray-300 mb-6">
+                            在 Actions 页面查看执行日志，确认签到是否成功
+                        </p>
+                        <div class="grid md:grid-cols-2 gap-6">
+                            <div class="bg-white dark:bg-gray-700 p-4 rounded-lg shadow-md">
+                                <img src="./images/5.png" alt="运行结果" class="w-full rounded-lg">
+                            </div>
+                            <div class="bg-white dark:bg-gray-700 p-4 rounded-lg shadow-md">
+                                <img src="./images/6.png" alt="执行日志" class="w-full rounded-lg">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Configuration Section -->
+    <section id="configuration" class="py-16 section-animate">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl font-bold mb-4">配置说明</h2>
+                <p class="text-xl text-gray-600 dark:text-gray-300">详细的配置参数说明</p>
+            </div>
+            
+            <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-8">
+                <h3 class="text-2xl font-bold mb-6">CONF 配置示例</h3>
+                <div class="code-block">
+                    <pre class="text-green-400 text-sm overflow-x-auto"><code>{
+  "Users": [
+    {
+      "Task": "CC",                    // 自定义任务名称，选填
+      "Username": "abc@163.com",       // 有道云笔记账号
+      "Password": "aaa"                // 账号密码
+    },
+    {
+      "Task": "CC_1",
+      "Username": "abcd@163.com", 
+      "Password": "bbb"
+    }
+  ],
+  "ScKey": "",                         // Server酱 ScKey，选填
+  "ScType": "",                        // 通知类型：Always/Failed，选填
+  "RdsServer": "",                     // Redis 服务器地址，选填
+  "RdsPwd": "",                        // Redis 密码，选填
+  "MySqlServer": "",                   // MySQL 数据库地址，选填
+  "MysqlUserName": "",                 // 数据库用户名，选填
+  "MySqlPwd": "",                      // 数据库密码，选填
+  "MySqlDatabase": ""                  // 数据库名称，选填
+}</code></pre>
+                </div>
+                
+                <div class="mt-8 grid md:grid-cols-2 gap-6">
+                    <div class="space-y-4">
+                        <h4 class="text-lg font-semibold">必填参数</h4>
+                        <div class="space-y-2">
+                            <div class="flex items-start">
+                                <i class="fas fa-user text-primary-600 mt-1 mr-3"></i>
+                                <div>
+                                    <strong>Username/Password</strong>
+                                    <p class="text-sm text-gray-600 dark:text-gray-300">有道云笔记账号和密码</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-4">
+                        <h4 class="text-lg font-semibold">可选参数</h4>
+                        <div class="space-y-2">
+                            <div class="flex items-start">
+                                <i class="fas fa-bell text-primary-600 mt-1 mr-3"></i>
+                                <div>
+                                    <strong>ScKey/ScType</strong>
+                                    <p class="text-sm text-gray-600 dark:text-gray-300">Server酱推送配置</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start">
+                                <i class="fas fa-database text-primary-600 mt-1 mr-3"></i>
+                                <div>
+                                    <strong>Redis/MySQL</strong>
+                                    <p class="text-sm text-gray-600 dark:text-gray-300">数据存储配置</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mt-12 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
+                <div class="flex">
+                    <i class="fas fa-info-circle text-blue-600 mt-1 mr-3"></i>
+                    <div>
+                        <h4 class="font-semibold text-blue-900 dark:text-blue-100 mb-2">重要提示</h4>
+                        <ul class="space-y-1 text-blue-800 dark:text-blue-200 text-sm">
+                            <li>• 支持配置多个账号同时签到</li>
+                            <li>• 建议配置 Redis 以避免频繁登录</li>
+                            <li>• 24小时内频繁登录可能触发验证码</li>
+                            <li>• 定时任务设置为每天 9:30 和 14:30 执行</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Support Section -->
+    <section class="py-16 bg-gradient-to-r from-purple-600 to-blue-600">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-white">
+            <h2 class="text-4xl font-bold mb-4">支持项目发展</h2>
+            <p class="text-xl mb-8 opacity-90">如果这个项目对您有帮助，欢迎请作者喝杯饮料！</p>
+            
+            <div class="bg-white/10 backdrop-blur-sm rounded-2xl p-8 max-w-2xl mx-auto">
+                <img src="./images/pay_tool.png" alt="支付二维码" class="w-full max-w-md mx-auto rounded-lg">
+                <p class="mt-4 text-sm opacity-80">微信 & 支付宝</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900 dark:bg-gray-950 text-white py-16">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid md:grid-cols-3 gap-8">
+                <div>
+                    <div class="flex items-center space-x-3 mb-4">
+                        <img src="./images/checkIn_256_icon.png" alt="Logo" class="w-10 h-10 rounded-lg">
+                        <span class="text-xl font-bold">Note163Checkin</span>
+                    </div>
+                    <p class="text-gray-400 mb-4">基于 GitHub Actions 的有道云笔记自动签到工具</p>
+                    <div class="flex space-x-4">
+                        <a href="https://github.com/xiuluo211314/Note163Checkin" target="_blank" class="text-gray-400 hover:text-white transition-colors">
+                            <i class="fab fa-github text-xl"></i>
+                        </a>
+                    </div>
+                </div>
+                
+                <div>
+                    <h3 class="font-semibold mb-4">快速链接</h3>
+                    <ul class="space-y-2 text-gray-400">
+                        <li><a href="#features" class="hover:text-white transition-colors">功能特色</a></li>
+                        <li><a href="#installation" class="hover:text-white transition-colors">安装指南</a></li>
+                        <li><a href="#configuration" class="hover:text-white transition-colors">配置说明</a></li>
+                        <li><a href="https://github.com/xiuluo211314/Note163Checkin/issues" target="_blank" class="hover:text-white transition-colors">问题反馈</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h3 class="font-semibold mb-4">作者信息</h3>
+                    <div class="space-y-2 text-gray-400">
+                        <p><strong>作者姓名:</strong> 阿洛 (xiuluo211314)</p>
+                        <p><strong>社交媒体:</strong></p>
+                        <div class="flex space-x-3 mt-2">
+                            <a href="https://twitter.com/xiuluo211314" target="_blank" class="hover:text-blue-400 transition-colors">
+                                <i class="fab fa-twitter"></i> Twitter/X
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="border-t border-gray-800 mt-12 pt-8 text-center text-gray-400">
+                <p>&copy; 2024 Note163Checkin. 基于 MIT 许可证开源。</p>
+                <p class="mt-2 text-sm">本项目重写自 <a href="https://github.com/BlueHtml/Note163Checkin" target="_blank" class="text-primary-400 hover:text-primary-300">BlueHtml/Note163Checkin</a>，向原作者致谢。</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Theme Toggle
+        const themeToggle = document.getElementById('theme-toggle');
+        const html = document.documentElement;
+        
+        // Check for saved theme preference or default to system preference
+        const savedTheme = localStorage.getItem('theme');
+        const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        
+        if (savedTheme) {
+            html.classList.toggle('dark', savedTheme === 'dark');
+        } else {
+            html.classList.toggle('dark', systemPrefersDark);
+        }
+        
+        themeToggle.addEventListener('click', () => {
+            html.classList.toggle('dark');
+            localStorage.setItem('theme', html.classList.contains('dark') ? 'dark' : 'light');
+        });
+        
+        // Smooth scroll for navigation links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+        
+        // Intersection Observer for animations
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+        
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('in-view');
+                }
+            });
+        }, observerOptions);
+        
+        document.querySelectorAll('.section-animate').forEach(el => {
+            observer.observe(el);
+        });
+        
+        // Add loading animation to images
+        document.querySelectorAll('img').forEach(img => {
+            img.addEventListener('load', function() {
+                this.style.opacity = '1';
+            });
+            img.style.opacity = '0';
+            img.style.transition = 'opacity 0.3s ease';
+        });
+        
+        // Back to top button
+        const backToTop = document.createElement('button');
+        backToTop.innerHTML = '<i class="fas fa-arrow-up"></i>';
+        backToTop.className = 'fixed bottom-8 right-8 bg-primary-600 text-white p-3 rounded-full shadow-lg opacity-0 transition-all duration-300 hover:bg-primary-700 hover:transform hover:scale-110 z-50';
+        backToTop.style.transform = 'translateY(100px)';
+        document.body.appendChild(backToTop);
+        
+        window.addEventListener('scroll', () => {
+            if (window.pageYOffset > 300) {
+                backToTop.style.opacity = '1';
+                backToTop.style.transform = 'translateY(0)';
+            } else {
+                backToTop.style.opacity = '0';
+                backToTop.style.transform = 'translateY(100px)';
+            }
+        });
+        
+        backToTop.addEventListener('click', () => {
+            window.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
+        });
+        
+        // Add parallax effect to hero section
+        window.addEventListener('scroll', () => {
+            const scrolled = window.pageYOffset;
+            const hero = document.querySelector('.gradient-bg');
+            if (hero) {
+                hero.style.transform = `translateY(${scrolled * 0.5}px)`;
+            }
+        });
+        
+        // Add typing effect to hero title (optional enhancement)
+        const heroTitle = document.querySelector('h1');
+        if (heroTitle) {
+            const text = heroTitle.textContent;
+            heroTitle.textContent = '';
+            let i = 0;
+            
+            const typeWriter = () => {
+                if (i < text.length) {
+                    heroTitle.textContent += text.charAt(i);
+                    i++;
+                    setTimeout(typeWriter, 100);
+                }
+            };
+            
+            setTimeout(typeWriter, 1000);
+        }
+    </script>
+</body>
+</html>
